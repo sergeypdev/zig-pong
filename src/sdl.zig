@@ -108,6 +108,35 @@ pub const Renderer = struct {
     }
 };
 
+pub const AudioDevice = struct {
+    deviceId: SDL_AudioDeviceID,
+    obtained: SDL_AudioSpec,
+
+    pub fn init(device: ?[*:0]const u8, isCapture: bool, desired: SDL_AudioSpec, allowedChanges: i32) !AudioDevice {
+        var obtained: SDL_AudioSpec = undefined;
+        var deviceId = SDL_OpenAudioDevice(device, @boolToInt(isCapture), &desired, &obtained, allowedChanges);
+
+        if (deviceId > 0) {
+            return AudioDevice{ .deviceId = deviceId, .obtained = obtained };
+        } else {
+            std.debug.warn("SDL: Failed to open audio device: {s}\n", .{SDL_GetError()});
+            return error.OpenAudioDevice;
+        }
+    }
+
+    pub fn deinit(self: AudioDevice) void {
+        SDL_CloseAudioDevice(self.deviceId);
+    }
+
+    pub fn play(self: AudioDevice) void {
+        SDL_PauseAudioDevice(self.deviceId, 0);
+    }
+
+    pub fn pause(self: AudioDevice) void {
+        SDL_PauseAudioDevice(self.deviceId, 1);
+    }
+};
+
 ///
 /// Returns the number of ms since start of the game
 ///

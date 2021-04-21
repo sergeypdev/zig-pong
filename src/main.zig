@@ -1,5 +1,6 @@
 const std = @import("std");
 const sdl = @import("sdl.zig");
+const Audio = @import("audio.zig").Audio;
 
 const Player = enum {
     left,
@@ -138,6 +139,12 @@ pub fn main() anyerror!void {
     if (maybe_info) |info| {
         std.debug.warn("Render name: {s}\nRender info: {}\n", .{ info.name, info });
     }
+
+    var audio = Audio.init();
+    defer audio.deinit();
+
+    try audio.open();
+    audio.play();
 
     var state = GameState.init();
 
