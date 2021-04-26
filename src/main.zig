@@ -1,6 +1,7 @@
 const std = @import("std");
 const sdl = @import("sdl.zig");
 const Audio = @import("audio.zig").Audio;
+const bounce_bytes = @embedFile("../assets/bounce.wav");
 
 const Player = enum {
     left,
@@ -58,6 +59,10 @@ const Ball = struct {
     pub fn right(self: Ball) i32 {
         return self.x + (BALL_RADIUS / 2);
     }
+};
+
+const GameAssets = struct {
+    bounce_pcm: []const i16,
 };
 
 const GameState = struct {
@@ -140,11 +145,26 @@ pub fn main() anyerror!void {
         std.debug.warn("Render name: {s}\nRender info: {}\n", .{ info.name, info });
     }
 
+    var bounce_rwops = try sdl.RWops.fromConstMem(bounce_bytes, bounce_bytes.len);
+    defer bounce_rwops.close() catch |err| std.debug.warn("bounce_rwops.close() error {}", .{err});
+
+    var bounce_spec: sdl.SDL_AudioSpec = undefined;
+    var bounce_pcm: [*c]u8 = undefined;
+    var bounce_pcm_len: u32 = undefined;
+
+    if (sdl.SDL_LoadWAV_RW(bounce_rwops.rwops, 0, &bounce_spec, &bounce_pcm, &bounce_pcm_len) == null) {
+        return error.WAVLoadError;
+    }
+    std.debug.warn("Bounce Audio Spec: {}", .{bounce_spec});
+    defer sdl.SDL_FreeWAV(bounce_pcm);
+
+    var assets = GameAssets{ .bounce_pcm = @ptrCast([*c]i16, @alignCast(@alignOf(i16), bounce_pcm))[0 .. bounce_pcm_len / 2] };
+
     var audio = Audio.init();
     defer audio.deinit();
 
     try audio.open();
-    audio.play();
+    audio.start();
 
     var state = GameState.init();
 
@@ -159,7 +179,7 @@ pub fn main() anyerror!void {
             }
         }
 
-        try gameUpdateAndRender(&state, &render);
+        try gameUpdateAndRender(&assets, &state, &render, &audio);
     }
 }
 
@@ -193,7 +213,7 @@ fn processInput(game_state: *GameState, event: sdl.SDL_KeyboardEvent) void {
     }
 }
 
-fn gameUpdateAndRender(state: *GameState, render: *sdl.Renderer) !void {
+fn gameUpdateAndRender(assets: *GameAssets, state: *GameState, render: *sdl.Renderer, audio: *Audio) !void {
     try render.setDrawColor(sdl.Color.black);
     try render.clear();
 
@@ -234,6 +254,11 @@ fn gameUpdateAndRender(state: *GameState, render: *sdl.Renderer) !void {
                 var bottom = state.left.paddle_bottom() + state.ball.radius;
                 if (state.ball.y >= top and state.ball.y <= bottom) {
                     state.ball.vx = -state.ball.vx;
+                    audio.play(.{
+                        .offset = @as(u64, 0),
+                        .data = assets.bounce_pcm,
+                        .volume = 64,
+                    });
                 }
             }
             if (state.ball.right() >= state.right.paddle_left() and state.ball.vx > 0) {
@@ -241,6 +266,11 @@ fn gameUpdateAndRender(state: *GameState, render: *sdl.Renderer) !void {
                 var bottom = state.right.paddle_bottom() + state.ball.radius;
                 if (state.ball.y >= top and state.ball.y <= bottom) {
                     state.ball.vx = -state.ball.vx;
+                    audio.play(.{
+                        .offset = 1,
+                        .data = assets.bounce_pcm,
+                        .volume = 64,
+                    });
                 }
             }
 
@@ -278,6 +308,20 @@ fn gameUpdateAndRender(state: *GameState, render: *sdl.Renderer) !void {
         .w = state.ball.radius,
         .h = state.ball.radius,
     });
+
+    const soundRatioX = WIDTH / @intToFloat(f32, audio.buffer_copy.len / 2);
+    const soundRatio = HEIGHT / @intToFloat(f32, std.math.maxInt(i16));
+    const graphSize = (soundRatio) * HEIGHT;
+
+    var i: usize = 0;
+    while (i < audio.buffer_copy.len / 2) : (i += 1) {
+        try render.fillRect(&.{
+            .x = @floatToInt(c_int, @intToFloat(f32, i) * soundRatioX),
+            .y = HEIGHT - @floatToInt(c_int, (graphSize / 2)),
+            .w = 1,
+            .h = @floatToInt(c_int, @intToFloat(f32, audio.buffer_copy[i]) * soundRatio),
+        });
+    }
 
     render.present();
 }

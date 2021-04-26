@@ -110,14 +110,14 @@ pub const Renderer = struct {
 
 pub const AudioDevice = struct {
     deviceId: SDL_AudioDeviceID,
-    obtained: SDL_AudioSpec,
+    spec: SDL_AudioSpec,
 
     pub fn init(device: ?[*:0]const u8, isCapture: bool, desired: SDL_AudioSpec, allowedChanges: i32) !AudioDevice {
         var obtained: SDL_AudioSpec = undefined;
         var deviceId = SDL_OpenAudioDevice(device, @boolToInt(isCapture), &desired, &obtained, allowedChanges);
 
         if (deviceId > 0) {
-            return AudioDevice{ .deviceId = deviceId, .obtained = obtained };
+            return AudioDevice{ .deviceId = deviceId, .spec = obtained };
         } else {
             std.debug.warn("SDL: Failed to open audio device: {s}\n", .{SDL_GetError()});
             return error.OpenAudioDevice;
@@ -137,9 +137,49 @@ pub const AudioDevice = struct {
     }
 };
 
+pub fn mixAudio(comptime T: type, dst: []T, src: []const T, format: SDL_AudioFormat, volume: u7) void {
+    std.debug.assert(src.len <= dst.len);
+    std.debug.assert(src.len <= std.math.maxInt(u32));
+    SDL_MixAudioFormat(
+        @ptrCast([*c]u8, @ptrCast([*c]T, dst)),
+        @ptrCast([*c]const u8, @ptrCast([*c]const T, src)),
+        format,
+        @intCast(u32, src.len),
+        @intCast(c_int, volume),
+    );
+}
+
 ///
 /// Returns the number of ms since start of the game
 ///
 pub fn ticks() u32 {
     return SDL_GetTicks();
 }
+
+pub fn getPerformanceCounter() u64 {
+    return SDL_GetPerformanceCounter();
+}
+
+pub fn getPerformanceFrequency() u64 {
+    return SDL_GetPerformanceFrequency();
+}
+
+pub const RWops = struct {
+    rwops: *SDL_RWops,
+
+    pub fn fromConstMem(mem: [*:0]const u8, len: usize) !RWops {
+        if (SDL_RWFromConstMem(@ptrCast(*const c_void, mem), @intCast(c_int, len))) |rwops| {
+            return RWops{ .rwops = rwops };
+        }
+
+        std.debug.warn("SDL: Failed to create RWops from const mem: {s}\n", .{SDL_GetError()});
+        return error.RWopsCreateFail;
+    }
+
+    pub fn close(self: *RWops) !void {
+        if (SDL_RWclose(self.rwops) != 0) {
+            std.debug.warn("SDL: Failed to close RWops: {s}\n", .{SDL_GetError()});
+            return error.RWopsCloseFail;
+        }
+    }
+};
