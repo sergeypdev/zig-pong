@@ -58,6 +58,14 @@ pub const Window = struct {
 pub const Renderer = struct {
     renderer: *SDL_Renderer,
 
+    pub const Texture = struct {
+        texture: *SDL_Texture,
+
+        pub fn deinit(self: *Texture) void {
+            SDL_DestroyTexture(self.texture);
+        }
+    };
+
     pub fn init(window: *Window, ind: i32, flags: u32) !Renderer {
         if (SDL_CreateRenderer(window.window, ind, flags)) |renderer| {
             return Renderer{ .renderer = renderer };
@@ -101,6 +109,17 @@ pub const Renderer = struct {
             std.debug.warn("SDL: Failed to fill rect: {s}\n", .{SDL_GetError()});
             return error.FillRect;
         }
+    }
+
+    pub fn createTextureFromSurface(self: *Renderer, surface: *Surface) !Texture {
+        var maybe_texture = SDL_CreateTextureFromSurface(self.renderer, surface.surface);
+
+        if (maybe_texture) |texture| {
+            return Texture{ .texture = texture };
+        }
+
+        std.debug.warn("SDL: Failed to create texture from surface: {s}\n", .{SDL_GetError()});
+        return error.CreateTextureFromSurface;
     }
 
     pub fn present(self: Renderer) void {
@@ -181,5 +200,34 @@ pub const RWops = struct {
             std.debug.warn("SDL: Failed to close RWops: {s}\n", .{SDL_GetError()});
             return error.RWopsCloseFail;
         }
+    }
+};
+
+pub const Surface = struct {
+    surface: *SDL_Surface,
+
+    pub fn createRGBFrom(
+        pixels: ?*c_void,
+        width: c_int,
+        height: c_int,
+        depth: c_int,
+        pitch: c_int,
+        rMask: u32,
+        gMask: u32,
+        bMask: u32,
+        aMask: u32,
+    ) !Surface {
+        var maybe_surface = SDL_CreateRGBSurfaceFrom(pixels, width, height, depth, pitch, rMask, gMask, bMask, aMask);
+
+        if (maybe_surface) |surface| {
+            return Surface{ .surface = surface };
+        }
+
+        std.debug.warn("SDL: Failed to create surface from pixels: {s}\n", .{SDL_GetError()});
+        return error.CreateSurfaceFrom;
+    }
+
+    pub fn deinit(self: *Surface) void {
+        SDL_FreeSurface(self.surface);
     }
 };

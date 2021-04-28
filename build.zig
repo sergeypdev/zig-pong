@@ -13,8 +13,13 @@ pub fn build(b: *std.build.Builder) void {
 
     const exe = b.addExecutable("zig-pong", "src/main.zig");
 
+    exe.linkLibC();
     exe.linkSystemLibrary("sdl2");
 
+    exe.addPackage(.{ .name = "stb", .path = "lib/stb.zig" });
+    exe.addCSourceFile("lib/stb_truetype.c", &[_][]const u8{});
+    exe.addCSourceFile("lib/stb_rect_pack.c", &[_][]const u8{});
+    exe.addIncludeDir("lib");
     exe.setTarget(target);
     exe.setBuildMode(mode);
     exe.install();
