@@ -16,10 +16,6 @@ pub fn build(b: *std.build.Builder) void {
     exe.linkLibC();
     exe.linkSystemLibrary("sdl2");
 
-    exe.addPackage(.{ .name = "stb", .path = "lib/stb.zig" });
-    exe.addCSourceFile("lib/stb_truetype.c", &[_][]const u8{});
-    exe.addCSourceFile("lib/stb_rect_pack.c", &[_][]const u8{});
-    exe.addIncludeDir("lib");
     exe.setTarget(target);
     exe.setBuildMode(mode);
     exe.install();
