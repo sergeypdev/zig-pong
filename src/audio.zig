@@ -8,7 +8,7 @@ pub const Audio = struct {
     sounds: [16]?Sound,
     next_sound_index: u8,
     cursor: u64, // current play cursor in the "global" timeline
-    buffer_copy: [2 * 512]i16 = [_]i16{0} ** (2 * 512),
+    buffer_copy: [2 * 2048]i16 = [_]i16{0} ** (2 * 2048),
 
     pub const Sound = struct {
         offset: u64,
@@ -34,7 +34,7 @@ pub const Audio = struct {
                 .freq = 48000,
                 .format = sdl.AUDIO_S16LSB,
                 .channels = 2,
-                .samples = 512,
+                .samples = 2048,
                 .callback = struct {
                     export fn callback(userdata: ?*c_void, data: [*c]u8, len: i32) void {
                         var audio = @ptrCast(*Audio, @alignCast(@alignOf(*Audio), userdata));
@@ -85,11 +85,11 @@ pub const Audio = struct {
 
         for (self.sounds) |maybe_sound, i| {
             if (maybe_sound) |sound| {
-                if (self.cursor < sound.offset) {
+                if (self.cursor + buffer.len <= sound.offset) {
                     continue;
                 }
-                // Figure out how much we need to copy
-                var soundBeginCursor = self.cursor - sound.offset;
+                // Figure out where in the sound we should start copying
+                var soundBeginCursor = self.cursor - std.math.min(sound.offset, self.cursor);
 
                 // Sound is finished
                 if (soundBeginCursor >= sound.data.len) {
@@ -97,9 +97,42 @@ pub const Audio = struct {
                     continue;
                 }
 
-                var soundEndCursor = soundBeginCursor + std.math.min(sound.data.len - soundBeginCursor, buffer.len);
+                var bufferStartOffset: usize = 0;
 
-                sdl.mixAudio(i16, buffer, sound.data[soundBeginCursor..soundEndCursor], sdl.AUDIO_S16LSB, sound.volume);
+                // Sound should begin in the middle of current buffer
+                if (sound.offset > self.cursor) {
+                    bufferStartOffset = sound.offset - self.cursor;
+                }
+
+                var copyLen = buffer.len - bufferStartOffset;
+
+                var soundEndCursor = soundBeginCursor + std.math.min(sound.data.len - soundBeginCursor, copyLen);
+
+                // sdl mixing
+                // sdl.mixAudio(i16, buffer[bufferStartOffset..], sound.data[soundBeginCursor..soundEndCursor], sdl.AUDIO_S16LSB, sound.volume);
+                //
+                // no mixing
+                // std.mem.copy(i16, buffer[bufferStartOffset..], sound.data[soundBeginCursor..soundEndCursor]);
+
+                // Custom mixing (just adding with clipping)
+                var bufferSlice = buffer[bufferStartOffset..];
+                var soundSlice = sound.data[soundBeginCursor..soundEndCursor];
+
+                var j: usize = 0;
+                while (j < soundSlice.len) : (j += 1) {
+                    var result: i16 = undefined;
+                    if (@addWithOverflow(i16, bufferSlice[j], soundSlice[j], &result)) {
+                        if (result > 0) {
+                            // Underflow
+                            bufferSlice[j] = std.math.maxInt(i16);
+                        } else {
+                            // Overflow
+                            bufferSlice[j] = std.math.minInt(i16);
+                        }
+                    } else {
+                        bufferSlice[j] = result;
+                    }
+                }
             }
         }
         self.cursor += buffer.len;

@@ -348,7 +348,7 @@ fn gameUpdateAndRender(assets: *GameAssets, state: *GameState, render: *sdl.Rend
     while (i < audio.buffer_copy.len / 2) : (i += 1) {
         try render.fillRect(&.{
             .x = @floatToInt(c_int, @intToFloat(f32, i) * soundRatioX),
-            .y = HEIGHT - @floatToInt(c_int, (graphSize / 2)),
+            .y = HEIGHT - @floatToInt(c_int, (graphSize)),
             .w = 1,
             .h = @floatToInt(c_int, @intToFloat(f32, audio.buffer_copy[i]) * soundRatio),
         });

@@ -160,8 +160,8 @@ pub fn mixAudio(comptime T: type, dst: []T, src: []const T, format: SDL_AudioFor
     std.debug.assert(src.len <= dst.len);
     std.debug.assert(src.len <= std.math.maxInt(u32));
     SDL_MixAudioFormat(
-        @ptrCast([*c]u8, @ptrCast([*c]T, dst)),
-        @ptrCast([*c]const u8, @ptrCast([*c]const T, src)),
+        @ptrCast([*c]u8, dst.ptr),
+        @ptrCast([*c]const u8, src.ptr),
         format,
         @intCast(u32, src.len),
         @intCast(c_int, volume),

@@ -3,9 +3,11 @@ Done:
 - Basic loop
 - Basic gameplay
 - Simple audio mixer
+- Bitmap font rendering
+- Proper audio start offset 
+- Correct mixing
 
 Next Up:
-- Bitmap font rendering
 - Score count
 - Main menu
 - Controller support
