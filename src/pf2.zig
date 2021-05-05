@@ -176,7 +176,6 @@ pub const PF2Font = struct {
     pub fn getChar(self: *const PF2Font, needle: u32) ?CharEntry {
         var chix = self.findCharIndex(needle) orelse return null;
 
-        std.debug.warn("Char {} offset {}\n", .{ needle, chix.offset });
         var data = self.data[chix.offset..];
 
         var width = std.mem.readIntSlice(u16, data, .Big);

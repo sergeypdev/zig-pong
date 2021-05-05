@@ -195,7 +195,7 @@ pub fn main() anyerror!void {
     try audio.open();
     audio.start();
 
-    var state = GlobalGameState{ .Game = GameState.init() };
+    var state = GlobalGameState{ .MainMenu = MainMenuState{ .selectedItem = .Play } };
 
     mainloop: while (true) {
         var event: sdl.SDL_Event = undefined;
@@ -252,7 +252,11 @@ fn gameUpdateAndRender(assets: *GameAssets, global_state: *GlobalGameState, rend
     try render.clear();
 
     switch (global_state.*) {
-        .MainMenu => |*state| {},
+        .MainMenu => |*state| {
+            try render.setDrawColor(sdl.Color.white);
+
+            try drawAlignedText(render, "MAIN MENU", .center, assets.other_font, 0, 800, 100, 4, 1);
+        },
         .Game => |*state| {
             try render.setDrawColor(sdl.Color.white);
 
@@ -338,14 +342,14 @@ fn gameUpdateAndRender(assets: *GameAssets, global_state: *GlobalGameState, rend
                 .h = PADDLE_HEIGHT,
             });
 
-            try drawTextPf2(render, "Test, I'm a ball", state.ball.x, state.ball.y, assets.other_font, 2, 1);
+            // try drawTextPf2(render, "Test, I'm a ball", state.ball.x, state.ball.y, assets.other_font, 2, 1);
 
-            // try render.fillRect(&.{
-            //     .x = state.ball.x - (@divTrunc(state.ball.radius, 2)),
-            //     .y = state.ball.y - (@divTrunc(state.ball.radius, 2)),
-            //     .w = state.ball.radius,
-            //     .h = state.ball.radius,
-            // });
+            try render.fillRect(&.{
+                .x = state.ball.x - (@divTrunc(state.ball.radius, 2)),
+                .y = state.ball.y - (@divTrunc(state.ball.radius, 2)),
+                .w = state.ball.radius,
+                .h = state.ball.radius,
+            });
 
             const soundRatioX = WIDTH / @intToFloat(f32, audio.buffer_copy.len / 2);
             const soundRatio = HEIGHT / @intToFloat(f32, std.math.maxInt(i16));
@@ -364,6 +368,50 @@ fn gameUpdateAndRender(assets: *GameAssets, global_state: *GlobalGameState, rend
     }
 
     render.present();
+}
+
+pub const TextAlign = enum {
+    left,
+    center,
+    right,
+};
+
+fn drawAlignedText(render: *sdl.Renderer, text: []const u8, alignment: TextAlign, font: *PF2Font, minX: i32, maxX: i32, y: i32, scale: i32, letterSpacing: i32) !void {
+    std.debug.assert(minX <= maxX);
+    var x: i32 = undefined;
+    switch (alignment) {
+        .left => x = minX,
+        .center => {
+            var width = try measureText(text, font, scale, letterSpacing);
+            var boundsMiddle = @divTrunc(maxX - minX, 2);
+            x = boundsMiddle - @divTrunc(width, 2);
+        },
+        .right => {
+            var width = try measureText(text, font, scale, letterSpacing);
+            x = maxX - width;
+        },
+    }
+
+    try drawTextPf2(render, text, x, y, font, scale, letterSpacing);
+}
+
+fn measureText(text: []const u8, font: *PF2Font, scale: i32, letterSpacing: i32) !i32 {
+    var width: i32 = 0;
+
+    var view = try unicode.Utf8View.init(text);
+    var iter = view.iterator();
+
+    while (iter.nextCodepoint()) |codepoint| {
+        var glyph = font.getChar(codepoint) orelse continue;
+
+        width += glyph.deviceWidth * scale + letterSpacing;
+    }
+
+    if (width > 0) {
+        width -= letterSpacing;
+    }
+
+    return width;
 }
 
 fn drawTextPf2(render: *sdl.Renderer, text: []const u8, screenX: i32, screenY: i32, font: *PF2Font, scale: i32, letterSpacing: i32) !void {
