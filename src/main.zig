@@ -149,6 +149,8 @@ const MEM_SIZE = 1024 * 1024 * 128; // 128 megs
 pub fn main() anyerror!void {
     var other_font = try PF2Font.fromConstMem(pf2_bytes);
 
+    std.debug.warn("Font: {}\n", .{other_font});
+
     var game_mem = try std.heap.c_allocator.alloc(u8, MEM_SIZE);
 
     var allocator = std.heap.FixedBufferAllocator.init(game_mem);
@@ -202,8 +204,8 @@ pub fn main() anyerror!void {
         while (sdl.SDL_PollEvent(&event) != 0) {
             switch (event.type) {
                 sdl.SDL_QUIT => break :mainloop,
-                sdl.SDL_KEYUP => processInput(&state, event.key),
-                sdl.SDL_KEYDOWN => processInput(&state, event.key),
+                sdl.SDL_KEYUP => processInput(&audio, &state, &assets, event.key),
+                sdl.SDL_KEYDOWN => processInput(&audio, &state, &assets, event.key),
                 else => {},
             }
         }
@@ -212,9 +214,28 @@ pub fn main() anyerror!void {
     }
 }
 
-fn processInput(global_game_state: *GlobalGameState, event: sdl.SDL_KeyboardEvent) void {
+fn processInput(audio: *Audio, global_game_state: *GlobalGameState, assets: *const GameAssets, event: sdl.SDL_KeyboardEvent) void {
     switch (global_game_state.*) {
-        .MainMenu => |*state| {},
+        .MainMenu => |*state| {
+            if (event.state == sdl.SDL_PRESSED) {
+                switch (event.keysym.scancode) {
+                    sdl.SDL_Scancode.SDL_SCANCODE_W, sdl.SDL_Scancode.SDL_SCANCODE_S => {
+                        audio.play(.{ .data = assets.bounce_pcm, .offset = 0, .volume = 127 });
+                        switch (state.selectedItem) {
+                            .Play => state.selectedItem = .Exit,
+                            .Exit => state.selectedItem = .Play,
+                        }
+                    },
+                    sdl.SDL_Scancode.SDL_SCANCODE_RETURN => {
+                        switch (state.selectedItem) {
+                            .Play => global_game_state.* = GlobalGameState{ .Game = GameState.init() },
+                            .Exit => std.debug.warn("Exit\n", .{}),
+                        }
+                    },
+                    else => {},
+                }
+            }
+        },
         .Game => |*game_state| {
             switch (game_state.phase) {
                 .starting => {
@@ -255,7 +276,43 @@ fn gameUpdateAndRender(assets: *GameAssets, global_state: *GlobalGameState, rend
         .MainMenu => |*state| {
             try render.setDrawColor(sdl.Color.white);
 
-            try drawAlignedText(render, "MAIN MENU", .center, assets.other_font, 0, 800, 100, 4, 1);
+            try drawAlignedText(render, "ZIG PONG", .center, assets.other_font, 0, 800, 100, 4, 1);
+
+            const buttonPadding = 20;
+            const buttonFontScale = 3;
+
+            switch (state.selectedItem) {
+                .Play => {
+                    var textWidth = try measureText("PLAY", assets.other_font, buttonFontScale, 1);
+                    var halfWidth = @divTrunc(textWidth, 2);
+                    try render.fillRect(&.{
+                        .x = 400 - halfWidth - buttonPadding,
+                        .y = 400 + assets.other_font.descent * buttonFontScale - assets.other_font.maxHeight * buttonFontScale - buttonPadding,
+                        .w = textWidth + buttonPadding * 2,
+                        .h = assets.other_font.maxHeight * buttonFontScale + buttonPadding * 2,
+                    });
+                    try render.setDrawColor(sdl.Color.black);
+                    try drawAlignedText(render, "PLAY", .center, assets.other_font, 0, 800, 400, buttonFontScale, 1);
+                    try render.setDrawColor(sdl.Color.white);
+
+                    try drawAlignedText(render, "EXIT", .center, assets.other_font, 0, 800, 500, buttonFontScale, 1);
+                },
+                .Exit => {
+                    try drawAlignedText(render, "PLAY", .center, assets.other_font, 0, 800, 400, buttonFontScale, 1);
+
+                    var textWidth = try measureText("EXIT", assets.other_font, buttonFontScale, 1);
+                    var halfWidth = @divTrunc(textWidth, 2);
+                    try render.fillRect(&.{
+                        .x = 400 - halfWidth - buttonPadding,
+                        .y = 500 + assets.other_font.descent * buttonFontScale - assets.other_font.maxHeight * buttonFontScale - buttonPadding,
+                        .w = textWidth + buttonPadding * 2,
+                        .h = assets.other_font.maxHeight * buttonFontScale + buttonPadding * 2,
+                    });
+                    try render.setDrawColor(sdl.Color.black);
+                    try drawAlignedText(render, "EXIT", .center, assets.other_font, 0, 800, 500, buttonFontScale, 1);
+                    try render.setDrawColor(sdl.Color.white);
+                },
+            }
         },
         .Game => |*state| {
             try render.setDrawColor(sdl.Color.white);

@@ -6,10 +6,11 @@ Done:
 - Bitmap font rendering
 - Proper audio start offset 
 - Correct mixing
+- PF2 Font rendering
 
 Next Up:
-- Score count
 - Main menu
+- Score count
 - Controller support
 - Fixed timestep game loop
 - Resolution independence
