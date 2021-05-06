@@ -197,24 +197,25 @@ pub fn main() anyerror!void {
     try audio.open();
     audio.start();
 
+    var shouldExit: bool = false;
     var state = GlobalGameState{ .MainMenu = MainMenuState{ .selectedItem = .Play } };
 
-    mainloop: while (true) {
+    mainloop: while (!shouldExit) {
         var event: sdl.SDL_Event = undefined;
         while (sdl.SDL_PollEvent(&event) != 0) {
             switch (event.type) {
                 sdl.SDL_QUIT => break :mainloop,
-                sdl.SDL_KEYUP => processInput(&audio, &state, &assets, event.key),
-                sdl.SDL_KEYDOWN => processInput(&audio, &state, &assets, event.key),
+                sdl.SDL_KEYUP => processInput(&audio, &state, &shouldExit, &assets, event.key),
+                sdl.SDL_KEYDOWN => processInput(&audio, &state, &shouldExit, &assets, event.key),
                 else => {},
             }
         }
 
-        try gameUpdateAndRender(&assets, &state, &render, &audio);
+        try gameUpdateAndRender(&assets, &state, &shouldExit, &render, &audio);
     }
 }
 
-fn processInput(audio: *Audio, global_game_state: *GlobalGameState, assets: *const GameAssets, event: sdl.SDL_KeyboardEvent) void {
+fn processInput(audio: *Audio, global_game_state: *GlobalGameState, shouldExit: *bool, assets: *const GameAssets, event: sdl.SDL_KeyboardEvent) void {
     switch (global_game_state.*) {
         .MainMenu => |*state| {
             if (event.state == sdl.SDL_PRESSED) {
@@ -229,7 +230,7 @@ fn processInput(audio: *Audio, global_game_state: *GlobalGameState, assets: *con
                     sdl.SDL_Scancode.SDL_SCANCODE_RETURN => {
                         switch (state.selectedItem) {
                             .Play => global_game_state.* = GlobalGameState{ .Game = GameState.init() },
-                            .Exit => std.debug.warn("Exit\n", .{}),
+                            .Exit => shouldExit.* = true,
                         }
                     },
                     else => {},
@@ -268,7 +269,7 @@ fn processInput(audio: *Audio, global_game_state: *GlobalGameState, assets: *con
     }
 }
 
-fn gameUpdateAndRender(assets: *GameAssets, global_state: *GlobalGameState, render: *sdl.Renderer, audio: *Audio) !void {
+fn gameUpdateAndRender(assets: *GameAssets, global_state: *GlobalGameState, shouldExit: *bool, render: *sdl.Renderer, audio: *Audio) !void {
     try render.setDrawColor(sdl.Color.black);
     try render.clear();
 

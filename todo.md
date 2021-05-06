@@ -7,9 +7,9 @@ Done:
 - Proper audio start offset 
 - Correct mixing
 - PF2 Font rendering
+- Main menu
 
 Next Up:
-- Main menu
 - Score count
 - Controller support
 - Fixed timestep game loop
