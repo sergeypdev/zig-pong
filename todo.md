@@ -8,9 +8,11 @@ Done:
 - Correct mixing
 - PF2 Font rendering
 - Main menu
+- Score count
+
+In progress:
 
 Next Up:
-- Score count
 - Controller support
 - Fixed timestep game loop
 - Resolution independence

@@ -24,6 +24,7 @@ const PlayerState = struct {
     y: i32,
     up: bool = false,
     down: bool = false,
+    score: u8 = 0,
 
     pub fn paddle_top(self: PlayerState) i32 {
         return self.y - (PADDLE_HEIGHT / 2);
@@ -269,6 +270,8 @@ fn processInput(audio: *Audio, global_game_state: *GlobalGameState, shouldExit: 
     }
 }
 
+const TOP_OFFSET = 64;
+
 fn gameUpdateAndRender(assets: *GameAssets, global_state: *GlobalGameState, shouldExit: *bool, render: *sdl.Renderer, audio: *Audio) !void {
     try render.setDrawColor(sdl.Color.black);
     try render.clear();
@@ -335,8 +338,8 @@ fn gameUpdateAndRender(assets: *GameAssets, global_state: *GlobalGameState, shou
                         state.right.y += 10;
                     }
 
-                    state.left.y = std.math.clamp(state.left.y, PADDLE_HEIGHT / 2, HEIGHT - (PADDLE_HEIGHT / 2));
-                    state.right.y = std.math.clamp(state.right.y, PADDLE_HEIGHT / 2, HEIGHT - (PADDLE_HEIGHT / 2));
+                    state.left.y = std.math.clamp(state.left.y, PADDLE_HEIGHT / 2 + TOP_OFFSET, HEIGHT - (PADDLE_HEIGHT / 2));
+                    state.right.y = std.math.clamp(state.right.y, PADDLE_HEIGHT / 2 + TOP_OFFSET, HEIGHT - (PADDLE_HEIGHT / 2));
 
                     state.ball.x += state.ball.vx;
                     state.ball.y += state.ball.vy;
@@ -344,7 +347,7 @@ fn gameUpdateAndRender(assets: *GameAssets, global_state: *GlobalGameState, shou
                     if (state.ball.bottom() >= HEIGHT) {
                         state.ball.vy = -state.ball.vy;
                     }
-                    if (state.ball.top() < 0) {
+                    if (state.ball.top() < TOP_OFFSET) {
                         state.ball.vy = -state.ball.vy;
                     }
 
@@ -375,14 +378,50 @@ fn gameUpdateAndRender(assets: *GameAssets, global_state: *GlobalGameState, shou
 
                     if (state.ball.left() < 0) {
                         state.phase = Phase{ .finished = .right };
-                        state.ball.radius = BALL_RADIUS * 2;
+                        _ = @addWithOverflow(u8, state.right.score, 1, &state.right.score);
                     } else if (state.ball.right() >= WIDTH) {
                         state.phase = Phase{ .finished = .left };
-                        state.ball.radius = BALL_RADIUS * 2;
+                        _ = @addWithOverflow(u8, state.left.score, 1, &state.left.score);
                     }
+
+                    try render.fillRect(&.{
+                        .x = state.ball.x - (@divTrunc(state.ball.radius, 2)),
+                        .y = state.ball.y - (@divTrunc(state.ball.radius, 2)),
+                        .w = state.ball.radius,
+                        .h = state.ball.radius,
+                    });
+                },
+                .finished => |winner| {
+                    var text = blk: {
+                        switch (winner) {
+                            .left => break :blk "Left Player Won!",
+                            .right => break :blk "Right Player Won!",
+                        }
+                    };
+
+                    try drawAlignedText(render, text, .center, assets.other_font, 0, 800, 300, 3, 1);
+                    try drawAlignedText(render, "Press any button to continue", .center, assets.other_font, 0, 800, 400, 2, 1);
                 },
                 else => {},
             }
+
+            const SEP_WIDTH = 4;
+
+            try render.fillRect(&.{
+                .x = WIDTH / 2 - SEP_WIDTH / 2,
+                .y = TOP_OFFSET,
+                .w = SEP_WIDTH,
+                .h = HEIGHT,
+            });
+
+            // Score drawing
+            var score = [_]u8{0} ** 3;
+
+            var leftScoreLen = std.fmt.formatIntBuf(score[0..], state.left.score, 10, false, .{});
+            try drawAlignedText(render, score[0..leftScoreLen], .right, assets.other_font, 0, WIDTH / 2 - SEP_WIDTH / 2 - 16, TOP_OFFSET - 16, 3, 0);
+
+            var rightScoreLen = std.fmt.formatIntBuf(score[0..], state.right.score, 10, false, .{});
+            try drawAlignedText(render, score[0..rightScoreLen], .left, assets.other_font, WIDTH / 2 + SEP_WIDTH / 2 + 16, WIDTH, TOP_OFFSET - 16, 3, 0);
 
             // Left paddle
             try render.fillRect(&.{
@@ -401,13 +440,6 @@ fn gameUpdateAndRender(assets: *GameAssets, global_state: *GlobalGameState, shou
             });
 
             // try drawTextPf2(render, "Test, I'm a ball", state.ball.x, state.ball.y, assets.other_font, 2, 1);
-
-            try render.fillRect(&.{
-                .x = state.ball.x - (@divTrunc(state.ball.radius, 2)),
-                .y = state.ball.y - (@divTrunc(state.ball.radius, 2)),
-                .w = state.ball.radius,
-                .h = state.ball.radius,
-            });
 
             const soundRatioX = WIDTH / @intToFloat(f32, audio.buffer_copy.len / 2);
             const soundRatio = HEIGHT / @intToFloat(f32, std.math.maxInt(i16));
